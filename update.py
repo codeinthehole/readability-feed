@@ -7,6 +7,7 @@ import re
 import os
 import readability
 from readability.api import ResponseError
+from BeautifulSoup import BeautifulSoup as Soup
 
 urlfinder = re.compile(r"(https?://[^ )]+)")
 
@@ -59,6 +60,22 @@ def get_article_urls_from_twitter_favourites(username, n=20):
     logger.info("Found %d articles", len(urls))
     return urls
 
+
+def get_top_hacker_news_articles(n=5):
+    logger.info("Fetching top Hacker news articles")
+    source_url = 'http://news.ycombinator.com/best'
+    soup = Soup(requests.get(source_url).content)
+    urls = []
+    for td in soup('td', attrs={'class': 'title'}):
+        anchor = td.find('a')
+        if not anchor:
+            continue
+        urls.append(anchor['href'])
+        if len(urls) == n:
+            break
+    return urls
+
+
 from config import *
 
 token = readability.xauth(
@@ -74,7 +91,9 @@ logger.info("Fetching library")
 library_urls = [u.article.url for u in user.bookmarks()]
 logger.info("Found %d articles in library", len(library_urls))
 
+# Fetch URLs
 urls = get_article_urls_from_twitter_favourites(TWITTER_USERNAME)
+urls += get_top_hacker_news_articles()
 
 num_dupes = num_new = num_errors = 0
 for url in urls:
@@ -89,6 +108,7 @@ for url in urls:
             logger.error("Unexpected exception: %s", e)
             num_errors += 1
         else:
+            logger.info("Adding %s", url)
             num_new += 1
 
 logger.info("Added %d new articles, found %d dupes, %d errors",
