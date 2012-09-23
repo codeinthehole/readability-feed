@@ -6,6 +6,7 @@ import requests
 import re
 import os
 import readability
+from readability.api import ResponseError
 
 urlfinder = re.compile(r"(https?://[^ )]+)")
 
@@ -75,12 +76,20 @@ logger.info("Found %d articles in library", len(library_urls))
 
 urls = get_article_urls_from_twitter_favourites(TWITTER_USERNAME)
 
-num_dupes = num_new = 0
+num_dupes = num_new = num_errors = 0
 for url in urls:
     if url in library_urls:
         num_dupes += 1
     else:
-        num_new += 1
-        rdd.add_bookmark(url)
+        try:
+            rdd.add_bookmark(url)
+        except ResponseError:
+            num_errors += 1
+        except Exception, e:
+            logger.error("Unexpected exception: %s", e)
+            num_errors += 1
+        else:
+            num_new += 1
 
-logger.info("Added %d new articles, found %d dupes", num_new, num_dupes)
+logger.info("Added %d new articles, found %d dupes, %d errors",
+            num_new, num_dupes, num_errors)
