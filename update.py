@@ -25,13 +25,26 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
+def is_url_an_article(url):
+    """
+    Test heuristically if the passed URL is an article
+    """
+    if url.endswith('.jpg'):
+        return False
+    banned_words = ('vimeo', 'youtube')
+    for word in banned_words:
+        if word in url:
+            return False
+    return True
+
+
 def get_article_urls_from_twitter_favourites(username, n=20):
     """
     Return a list of article URLs extracted from a user's twitter favourites
     """
     urls = []
 
-    logger.info("Fetching Twitter favourite articles for %s", username)
+    logger.info("Fetching articles from Twitter favourite for %s", username)
     twitter_url = 'https://api.twitter.com/1/favorites.json?count=%d&screen_name=%s' % (
         n, username)
     response = requests.get(twitter_url)
@@ -51,11 +64,8 @@ def get_article_urls_from_twitter_favourites(username, n=20):
         if 'text/html' not in url_resp.headers['content-type']:
             continue
         url = url_resp.url
-        if url.endswith('.jpg'):
-            continue
-        if 'vimeo' in url:
-            continue
-        urls.append(url_resp.url)
+        if is_url_an_article(url):
+            urls.append(url_resp.url)
 
     logger.info("Found %d articles", len(urls))
     return urls
@@ -77,6 +87,7 @@ def get_top_hacker_news_articles(n=5):
 
 
 def get_economist_articles():
+    logger.info("Fetching top Economist articles")
     source_url = 'http://www.economist.com'
     soup = Soup(requests.get(source_url).content)
     ul = soup.find('ul', id='recommended-list')
@@ -88,39 +99,44 @@ def get_economist_articles():
 
 from config import *
 
-token = readability.xauth(
-    CONSUMER_KEY, CONSUMER_SECRET, USERNAME, PASSWORD)
-rdd = readability.oauth(
-    CONSUMER_KEY, CONSUMER_SECRET, token=token)
 
-user = rdd.get_me()
+def main():
+    token = readability.xauth(
+        CONSUMER_KEY, CONSUMER_SECRET, USERNAME, PASSWORD)
+    rdd = readability.oauth(
+        CONSUMER_KEY, CONSUMER_SECRET, token=token)
 
-logger.info("Updating readability library")
+    user = rdd.get_me()
 
-library_urls = [u.article.url for u in user.bookmarks()]
-logger.info("Found %d articles in library", len(library_urls))
+    logger.info("Updating readability library")
 
-# Fetch URLs
-urls = get_article_urls_from_twitter_favourites(TWITTER_USERNAME)
-urls += get_top_hacker_news_articles()
-urls += get_economist_articles()
-logger.info("Found %d articles to add", len(urls))
+    library_urls = [u.article.url for u in user.bookmarks()]
+    logger.info("Found %d articles in library", len(library_urls))
 
-num_dupes = num_new = num_errors = 0
-for url in urls:
-    if url in library_urls:
-        num_dupes += 1
-    else:
-        logger.info("Adding %s", url)
-        try:
-            rdd.add_bookmark(url)
-        except ResponseError:
-            num_errors += 1
-        except Exception, e:
-            logger.error("Unexpected exception: %s", e)
-            num_errors += 1
+    # Fetch URLs
+    urls = get_article_urls_from_twitter_favourites(TWITTER_USERNAME)
+    urls += get_top_hacker_news_articles()
+    urls += get_economist_articles()
+    logger.info("Found %d articles to add", len(urls))
+
+    num_dupes = num_new = num_errors = 0
+    for url in urls:
+        if url in library_urls:
+            num_dupes += 1
         else:
-            num_new += 1
+            logger.info("Adding %s", url)
+            try:
+                rdd.add_bookmark(url)
+            except ResponseError:
+                num_errors += 1
+            except Exception, e:
+                logger.error("Unexpected exception: %s", e)
+                num_errors += 1
+            else:
+                num_new += 1
 
-logger.info("Added %d new articles, found %d dupes, %d errors",
-            num_new, num_dupes, num_errors)
+    logger.info("Added %d new articles, found %d dupes, %d errors",
+                num_new, num_dupes, num_errors)
+
+if __name__ == '__main__':
+    main()
