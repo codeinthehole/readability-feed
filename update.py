@@ -97,6 +97,17 @@ def get_economist_articles():
     return urls
 
 
+def get_atlantic_articles():
+    logger.info("Fetching top Atlantic articles")
+    source_url = 'http://www.theatlantic.com'
+    soup = Soup(requests.get(source_url).content)
+    div = soup.find('div', id='mostPopular')
+    urls = []
+    for anchor in div.findAll('a'):
+        urls.append(source_url + anchor['href'])
+    return urls
+
+
 from config import *
 
 
@@ -105,7 +116,6 @@ def main():
         CONSUMER_KEY, CONSUMER_SECRET, USERNAME, PASSWORD)
     rdd = readability.oauth(
         CONSUMER_KEY, CONSUMER_SECRET, token=token)
-
     user = rdd.get_me()
 
     logger.info("Updating readability library")
@@ -117,6 +127,7 @@ def main():
     urls = get_article_urls_from_twitter_favourites(TWITTER_USERNAME)
     urls += get_top_hacker_news_articles()
     urls += get_economist_articles()
+    urls += get_atlantic_articles()
     logger.info("Found %d articles to add", len(urls))
 
     num_dupes = num_new = num_errors = 0
