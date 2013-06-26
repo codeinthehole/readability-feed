@@ -8,6 +8,9 @@ import os
 import readability
 from readability.api import ResponseError
 from BeautifulSoup import BeautifulSoup as Soup
+import twitter
+
+from config import *
 
 urlfinder = re.compile(r"(https?://[^ )]+)")
 
@@ -42,18 +45,19 @@ def get_article_urls_from_twitter_favourites(username, n=20):
     """
     Return a list of article URLs extracted from a user's twitter favourites
     """
-    urls = []
-
     logger.info("Fetching articles from Twitter favourite for %s", username)
-    twitter_url = 'https://api.twitter.com/1/favorites.json?count=%d&screen_name=%s' % (
-        n, username)
-    response = requests.get(twitter_url)
+    api = twitter.Api(
+        consumer_key=TWITTER_CONSUMER_KEY,
+        consumer_secret=TWITTER_CONSUMER_SECRET,
+        access_token_key=TWITTER_ACCESS_TOKEN_KEY,
+        access_token_secret=TWITTER_ACCESS_TOKEN_SECRET,
+    )
+    favourites = api.GetFavorites()
 
-    if response.status_code != 200:
-        return []
+    urls = []
+    for tweet in favourites:
+        text = tweet.text
 
-    for tweet in response.json:
-        text = tweet['text']
         # Look for a link
         match = urlfinder.search(text)
         if not match:
@@ -97,7 +101,7 @@ def get_economist_articles():
     return urls
 
 
-def get_atlantic_articles():
+def get_atlantic_articles(num=10):
     logger.info("Fetching top Atlantic articles")
     source_url = 'http://www.theatlantic.com'
     soup = Soup(requests.get(source_url).content)
@@ -105,10 +109,9 @@ def get_atlantic_articles():
     urls = []
     for anchor in div.findAll('a'):
         urls.append(source_url + anchor['href'])
-    return urls
+    return urls[:num]
 
 
-from config import *
 
 
 def main():
@@ -125,9 +128,9 @@ def main():
 
     # Fetch URLs
     urls = get_article_urls_from_twitter_favourites(TWITTER_USERNAME)
-    urls += get_top_hacker_news_articles()
-    urls += get_economist_articles()
-    urls += get_atlantic_articles()
+    #urls += get_top_hacker_news_articles()
+    #urls += get_economist_articles()
+    #urls += get_atlantic_articles(3)  # Only 3 as it's too noisy
     logger.info("Found %d articles to add", len(urls))
 
     num_dupes = num_new = num_errors = 0
