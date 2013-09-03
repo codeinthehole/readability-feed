@@ -90,7 +90,7 @@ def get_top_hacker_news_articles(n=5):
     return urls
 
 
-def get_economist_articles():
+def get_economist_articles(num=10):
     logger.info("Fetching top Economist articles")
     source_url = 'http://www.economist.com'
     soup = Soup(requests.get(source_url).content)
@@ -98,7 +98,7 @@ def get_economist_articles():
     urls = []
     for anchor in ul.findAll('a'):
         urls.append(source_url + anchor['href'])
-    return urls
+    return urls[:num]
 
 
 def get_atlantic_articles(num=10):
@@ -110,8 +110,6 @@ def get_atlantic_articles(num=10):
     for anchor in div.findAll('a'):
         urls.append(source_url + anchor['href'])
     return urls[:num]
-
-
 
 
 def main():
@@ -128,9 +126,9 @@ def main():
 
     # Fetch URLs
     urls = get_article_urls_from_twitter_favourites(TWITTER_USERNAME)
-    #urls += get_top_hacker_news_articles()
-    #urls += get_economist_articles()
-    #urls += get_atlantic_articles(3)  # Only 3 as it's too noisy
+    urls += get_top_hacker_news_articles(5)
+    urls += get_economist_articles(5)
+    urls += get_atlantic_articles(2)  # Only 3 as it's too noisy
     logger.info("Found %d articles to add", len(urls))
 
     num_dupes = num_new = num_errors = 0
